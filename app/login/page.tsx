@@ -1,6 +1,6 @@
 'use client'
 import Link from "next/link";
-import { redirect, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { LoginForm } from "@/components/auth/login-form";
 import {
@@ -19,15 +19,16 @@ import { useEffect } from "react";
 
 export default function LoginPage() {
 
+  const router = useRouter();
   const searchParams = useSearchParams()
 
   useEffect(()=>{
   getCurrentSession().then((session) => {
     if (session) {
-        redirect("/dashboard/products");
+        router.replace("/dashboard/products");
       }
   });
-  },[])
+  },[router])
 
   
  

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from "next/link";
-import { redirect, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 
 import { SignupForm } from "@/components/auth/signup-form";
@@ -15,15 +15,16 @@ import {
 import { getCurrentSession } from "@/lib/auth/session";
 
 export default function SignupPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   useEffect(() => {
     getCurrentSession().then((session) => {
       if (session) {
-        redirect("/dashboard/products");
+        router.replace("/dashboard/products");
       }
     });
-  }, []);
+  }, [router]);
 
   const redirectToParam = searchParams.get("redirectTo") ? searchParams.get("redirectTo") : null;
 
