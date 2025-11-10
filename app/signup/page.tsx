@@ -1,8 +1,10 @@
 'use client'
+
 import Link from "next/link";
 import { redirect, useSearchParams } from "next/navigation";
+import { useEffect } from "react";
 
-import { LoginForm } from "@/components/auth/login-form";
+import { SignupForm } from "@/components/auth/signup-form";
 import {
   Card,
   CardContent,
@@ -11,29 +13,20 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getCurrentSession } from "@/lib/auth/session";
-import { useEffect } from "react";
 
+export default function SignupPage() {
+  const searchParams = useSearchParams();
 
-
-
-
-export default function LoginPage() {
-
-  const searchParams = useSearchParams()
-
-  useEffect(()=>{
-  getCurrentSession().then((session) => {
-    if (session) {
+  useEffect(() => {
+    getCurrentSession().then((session) => {
+      if (session) {
         redirect("/dashboard/products");
       }
-  });
-  },[])
+    });
+  }, []);
 
-  
- 
-  
+  const redirectToParam = searchParams.get("redirectTo") ? searchParams.get("redirectTo") : null;
 
-  const redirectToParam = searchParams.get("redirectTo") ? searchParams.get("redirectTo"): null   
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-4 py-12">
       <div className="mx-auto w-full max-w-md space-y-6">
@@ -41,36 +34,33 @@ export default function LoginPage() {
           <Link href="/" className="text-sm font-semibold uppercase tracking-widest text-slate-500">
             Myshop
           </Link>
-          <h1 className="mt-3 text-2xl font-semibold text-slate-900">Welcome back</h1>
+          <h1 className="mt-3 text-2xl font-semibold text-slate-900">Create your seller account</h1>
           <p className="mt-1 text-sm text-slate-600">
-            Sign in with your seller credentials to manage your products.
+            Sign up to start managing your products and profile.
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Sign in</CardTitle>
-            <CardDescription>
-              Use the email and password associated with your seller account.
-            </CardDescription>
+            <CardTitle>Create account</CardTitle>
+            <CardDescription>Enter your details to create a seller account.</CardDescription>
           </CardHeader>
 
           <CardContent>
-            <LoginForm  redirectTo={redirectToParam} />
+            <SignupForm redirectTo={redirectToParam} />
           </CardContent>
         </Card>
 
         <p className="text-center text-xs text-slate-500">
-          Don&apos;t have an account?{" "}
+          Already have an account? {" "}
           <Link
             className="font-medium text-slate-900 underline underline-offset-4"
-            href={redirectToParam ? `/signup?redirectTo=${encodeURIComponent(redirectToParam)}` : "/signup"}
+            href={redirectToParam ? `/login?redirectTo=${encodeURIComponent(redirectToParam)}` : "/login"}
           >
-            Create one now
+            Sign in
           </Link>
         </p>
       </div>
     </div>
   );
 }
-

@@ -1,0 +1,192 @@
+"use client";
+
+import { useMemo, useState, useTransition } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert } from "@/components/ui/alert";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { cn } from "@/lib/utils";
+
+const signupSchema = z
+  .object({
+    fullName: z.string().min(2, "Enter your full name"),
+    email: z.string().email("Enter a valid email address"),
+    password: z.string().min(6, "Password must be at least 6 characters"),
+    confirmPassword: z.string().min(6, "Confirm your password"),
+  })
+  .refine((values) => values.password === values.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
+
+export type SignupValues = z.infer<typeof signupSchema>;
+
+interface SignupFormProps {
+  redirectTo?: string | null;
+  className?: string;
+}
+
+export function SignupForm({ redirectTo, className }: SignupFormProps) {
+  const router = useRouter();
+  const callbackUrl = redirectTo ?? "/dashboard/products";
+
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const form = useForm<SignupValues>({
+    resolver: zodResolver(signupSchema),
+    defaultValues: {
+      fullName: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
+
+  const onSubmit = (values: SignupValues) => {
+    setError(null);
+    setInfo(null);
+
+    startTransition(async () => {
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        options: {
+          data: {
+            full_name: values.fullName,
+          },
+        },
+      });
+
+      if (signUpError) {
+        setError(signUpError.message);
+        return;
+      }
+
+      if (data.session && data.user) {
+        const now = new Date().toISOString();
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .upsert({
+            id: data.user.id,
+            full_name: values.fullName,
+            created_at: now,
+            updated_at: now,
+          });
+
+        if (profileError) {
+          setError(profileError.message);
+          return;
+        }
+
+        router.replace(callbackUrl);
+        router.refresh();
+        return;
+      }
+
+      setInfo("Account created. Please verify your email before signing in.");
+      form.reset();
+    });
+  };
+
+  return (
+    <form
+      onSubmit={form.handleSubmit(onSubmit)}
+      className={cn("space-y-6", className)}
+      noValidate
+    >
+      <div className="space-y-2">
+        <Label htmlFor="fullName">Full name</Label>
+        <Input
+          id="fullName"
+          placeholder="Jane Doe"
+          autoComplete="name"
+          {...form.register("fullName")}
+          aria-invalid={Boolean(form.formState.errors.fullName)}
+        />
+        {form.formState.errors.fullName ? (
+          <p className="text-sm text-red-600">{form.formState.errors.fullName.message}</p>
+        ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="email">Email</Label>
+        <Input
+          id="email"
+          type="email"
+          placeholder="seller@example.com"
+          autoComplete="email"
+          {...form.register("email")}
+          aria-invalid={Boolean(form.formState.errors.email)}
+        />
+        {form.formState.errors.email ? (
+          <p className="text-sm text-red-600">{form.formState.errors.email.message}</p>
+        ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="password">Password</Label>
+        <Input
+          id="password"
+          type="password"
+          placeholder="••••••••"
+          autoComplete="new-password"
+          {...form.register("password")}
+          aria-invalid={Boolean(form.formState.errors.password)}
+        />
+        {form.formState.errors.password ? (
+          <p className="text-sm text-red-600">{form.formState.errors.password.message}</p>
+        ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="confirmPassword">Confirm password</Label>
+        <Input
+          id="confirmPassword"
+          type="password"
+          placeholder="••••••••"
+          autoComplete="new-password"
+          {...form.register("confirmPassword")}
+          aria-invalid={Boolean(form.formState.errors.confirmPassword)}
+        />
+        {form.formState.errors.confirmPassword ? (
+          <p className="text-sm text-red-600">
+            {form.formState.errors.confirmPassword.message}
+          </p>
+        ) : null}
+      </div>
+
+      {error ? (
+        <Alert variant="destructive">
+          <span>{error}</span>
+        </Alert>
+      ) : null}
+
+      {info ? (
+        <Alert>
+          <span>{info}</span>
+        </Alert>
+      ) : null}
+
+      <Button type="submit" className="w-full" disabled={isPending}>
+        {isPending ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            Creating account...
+          </>
+        ) : (
+          "Create account"
+        )}
+      </Button>
+    </form>
+  );
+}
