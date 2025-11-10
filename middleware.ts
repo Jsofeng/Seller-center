@@ -30,23 +30,16 @@ export async function middleware(request: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession();
 
-  const isAuthPage = ["/login", "/signup"].includes(request.nextUrl.pathname);
-  const isDashboardRoute = request.nextUrl.pathname.startsWith("/dashboard");
-
-  if (!session && isDashboardRoute) {
+  if (!session) {
     const redirectUrl = new URL("/login", request.url);
     redirectUrl.searchParams.set("redirectTo", request.nextUrl.pathname + request.nextUrl.search);
     return NextResponse.redirect(redirectUrl);
-  }
-
-  if (session && isAuthPage) {
-    return NextResponse.redirect(new URL("/dashboard/products", request.url));
   }
 
   return response;
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login", "/signup"],
+  matcher: ["/dashboard/:path*"],
 };
 

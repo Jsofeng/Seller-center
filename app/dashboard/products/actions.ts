@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getCurrentUser } from "@/lib/auth/session";
+import { getCurrentServerUser } from "@/lib/auth/server";
 import {
   createProduct,
   deleteProduct as deleteProductFromDb,
@@ -33,7 +33,7 @@ function toProductInput(values: ProductFormValues): ProductInput {
 export async function createProductAction(
   values: ProductFormValues,
 ): Promise<ProductActionResult> {
-  const user = await getCurrentUser();
+  const user = await getCurrentServerUser();
   if (!user) {
     return { error: "You must be signed in to create products." };
   }
@@ -60,7 +60,7 @@ export async function createProductAction(
 export async function updateProductAction(
   values: ProductFormValues,
 ): Promise<ProductActionResult> {
-  const user = await getCurrentUser();
+  const user = await getCurrentServerUser();
   if (!user) {
     return { error: "You must be signed in to update products." };
   }
@@ -92,7 +92,7 @@ export async function updateProductAction(
 }
 
 export async function deleteProductAction(id: string): Promise<DeleteProductResult> {
-  const user = await getCurrentUser();
+  const user = await getCurrentServerUser();
   if (!user) {
     return { error: "You must be signed in to delete products." };
   }

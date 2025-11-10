@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { ProductsView } from "@/components/products/products-view";
-import { getCurrentUser } from "@/lib/auth/session";
+import { getCurrentServerUser } from "@/lib/auth/server";
 import { getProductsBySeller } from "@/lib/products";
 
 export const metadata: Metadata = {
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default async function ProductsPage() {
-  const user = await getCurrentUser();
+  const user = await getCurrentServerUser();
   if (!user) {
     redirect("/login");
   }

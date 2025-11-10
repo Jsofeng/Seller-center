@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 
 import { ProfileForm } from "@/components/profile/profile-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getCurrentUser } from "@/lib/auth/session";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { getCurrentServerUser } from "@/lib/auth/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import type { Database } from "@/types/database";
 
 export const metadata: Metadata = {
@@ -14,12 +14,12 @@ export const metadata: Metadata = {
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
 export default async function ProfilePage() {
-  const user = await getCurrentUser();
+  const user = await getCurrentServerUser();
   if (!user) {
     redirect("/login");
   }
 
-  const supabase = createSupabaseBrowserClient();
+  const supabase = createSupabaseServerClient();
   const { data: profile, error } = await supabase
     .from("profiles")
     .select("*")

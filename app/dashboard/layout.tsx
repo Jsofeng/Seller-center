@@ -2,14 +2,14 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 
 import { DashboardSidebar } from "@/components/navigation/sidebar";
-import { getCurrentUser } from "@/lib/auth/session";
+import { getCurrentServerUser } from "@/lib/auth/server";
 
 interface DashboardLayoutProps {
   children: ReactNode;
 }
 
 export default async function DashboardLayout({ children }: DashboardLayoutProps) {
-  const user = await getCurrentUser();
+  const user = await getCurrentServerUser();
   if (!user) {
     redirect("/login");
   }
