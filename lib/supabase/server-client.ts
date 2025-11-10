@@ -4,40 +4,34 @@ import type { CookieOptions } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
-type ReadonlyCookieStore = Awaited<ReturnType<typeof cookies>>;
-type MutableCookieStore = ReadonlyCookieStore & {
-  set: (options: { name: string; value: string } & Partial<CookieOptions>) => void;
-};
+function getMutableCookieStore() {
+  const store = cookies();
 
-function getCookieStore(): MutableCookieStore {
-  const storeOrPromise = cookies();
-
-  if (storeOrPromise instanceof Promise) {
-    throw new Error("Invariant: cookies() returned a Promise. Ensure edge runtime is disabled for this route.");
+  if (store instanceof Promise) {
+    throw new Error(
+      "Invariant: cookies() returned a Promise. Ensure this helper is not called in the edge runtime.",
+    );
   }
 
-  const store = storeOrPromise as Partial<MutableCookieStore>;
-  if (typeof store.set !== "function") {
-    throw new Error("Invariant: cookies() returned a read-only store. Ensure this is called inside a Server Action or Route Handler.");
-  }
-
-  return store as MutableCookieStore;
+  return store;
 }
 
 export function createSupabaseServerClient(): SupabaseClient {
+  const cookieStore = getMutableCookieStore();
+
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         get(name: string) {
-          return getCookieStore().get(name);
+          return cookieStore.get(name)?.value;
         },
         set(name: string, value: string, options: CookieOptions) {
-          getCookieStore().set({ name, value, ...options });
+          cookieStore.set?.({ name, value, ...options });
         },
         remove(name: string, options: CookieOptions) {
-          getCookieStore().set({ name, value: "", ...options, maxAge: 0 });
+          cookieStore.set?.({ name, value: "", ...options, maxAge: 0 });
         },
       },
     },
