@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import Image from "next/image";
+import type { ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, type Resolver, useFieldArray, useForm } from "react-hook-form";
-import { Loader2 } from "lucide-react";
+import { ImagePlus, Loader2, Trash2 } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -57,9 +59,26 @@ interface ProductFormProps {
   initialValues?: Partial<ProductFormValues>;
   error?: string | null;
   isSubmitting?: boolean;
-  onSubmit: (values: ProductFormValues) => Promise<void>;
+  onSubmit: (values: ProductFormValues, images: File[]) => Promise<void>;
   onCancel: () => void;
 }
+
+const MAX_IMAGE_COUNT = 8;
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+
+type ImagePreview = {
+  id: string;
+  file: File;
+  previewUrl: string;
+};
+
+const formatFileSize = (bytes: number) => {
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  const kilobytes = Math.max(1, Math.round(bytes / 1024));
+  return `${kilobytes} KB`;
+};
 
 function toInputDefaults(initialValues?: Partial<ProductFormValues>): ProductFormInputs {
   const mapIncoterm = (incoterm?: ProductFormValues["incoterms"][number]) => ({
@@ -131,6 +150,10 @@ export function ProductForm({
     resolver: zodResolver(productFormSchema) as unknown as Resolver<ProductFormInputs>,
     defaultValues: toInputDefaults(initialValues),
   });
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [imagePreviews, setImagePreviews] = useState<ImagePreview[]>([]);
+  const [imageError, setImageError] = useState<string | null>(null);
 
   const {
     fields: incotermFields,
@@ -209,7 +232,10 @@ export function ProductForm({
 
   const submitHandler = handleSubmit(async (values) => {
     const parsed = productFormSchema.parse(values);
-    await onSubmit(parsed);
+    await onSubmit(
+      parsed,
+      imagePreviews.map((item) => item.file),
+    );
   });
 
   const handleIncotermRemove = (index: number) => {
@@ -220,6 +246,77 @@ export function ProductForm({
     }
     removeIncoterm(index);
   };
+
+  const openFileDialog = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImagesSelected = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+
+    if (!files.length) {
+      return;
+    }
+
+    const allowed = files.filter((file) => file.type.startsWith("image/"));
+    if (!allowed.length) {
+      setImageError("Only image files are supported.");
+      return;
+    }
+
+    const remainingSlots = MAX_IMAGE_COUNT - imagePreviews.length;
+    if (remainingSlots <= 0) {
+      setImageError(`You can upload up to ${MAX_IMAGE_COUNT} images.`);
+      return;
+    }
+
+    const accepted: ImagePreview[] = [];
+    let rejectedSize = false;
+
+    for (const file of allowed) {
+      if (accepted.length >= remainingSlots) {
+        break;
+      }
+      if (file.size > MAX_IMAGE_SIZE_BYTES) {
+        rejectedSize = true;
+        continue;
+      }
+      const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${file.name}`;
+      accepted.push({
+        id,
+        file,
+        previewUrl: URL.createObjectURL(file),
+      });
+    }
+
+    if (rejectedSize) {
+      setImageError(`Some files exceeded the ${Math.round(MAX_IMAGE_SIZE_BYTES / (1024 * 1024))}MB limit and were skipped.`);
+    } else {
+      setImageError(null);
+    }
+
+    if (accepted.length) {
+      setImagePreviews((prev) => [...prev, ...accepted]);
+    }
+  };
+
+  const handleImageRemove = (id: string) => {
+    setImagePreviews((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      const removed = prev.find((item) => item.id === id);
+      if (removed) {
+        URL.revokeObjectURL(removed.previewUrl);
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    return () => {
+      imagePreviews.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+    };
+  }, [imagePreviews]);
 
   const addIncoterm = () => {
     if (incotermFields.length >= 5) {
@@ -259,6 +356,75 @@ export function ProductForm({
               )}
             />
             {errors?.name ? <p className="text-xs text-red-600">{errors.name.message as string}</p> : null}
+        </div>
+
+        <div className="space-y-3 sm:col-span-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="product-images">Product images</Label>
+              <p className="text-xs text-slate-500">
+                Upload up to {MAX_IMAGE_COUNT} images. Max 5MB each. You can remove or reorder them later.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={openFileDialog}
+              disabled={imagePreviews.length >= MAX_IMAGE_COUNT}
+            >
+              <ImagePlus className="mr-2 h-4 w-4" aria-hidden="true" />
+              Add images
+            </Button>
+          </div>
+          <input
+            ref={fileInputRef}
+            id="product-images"
+            type="file"
+            accept="image/*"
+            multiple
+            className="sr-only"
+            onChange={handleImagesSelected}
+          />
+
+          {imagePreviews.length ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              {imagePreviews.map((image) => (
+                <div
+                  key={image.id}
+                  className="group relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50"
+                >
+                  <Image
+                    src={image.previewUrl}
+                    alt="Selected product image"
+                    className="h-36 w-full object-cover transition group-hover:scale-105"
+                    width={320}
+                    height={320}
+                    unoptimized
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleImageRemove(image.id)}
+                    className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-700 shadow-sm transition hover:bg-red-500 hover:text-white"
+                    aria-label="Remove image"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1 text-[11px] text-white">
+                    {formatFileSize(image.file.size)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex min-h-[140px] items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white">
+              <div className="text-center text-sm text-slate-500">
+                <p>No images selected yet.</p>
+                <p>Click &ldquo;Add images&rdquo; to start uploading.</p>
+              </div>
+            </div>
+          )}
+          {imageError ? <p className="text-xs text-red-600">{imageError}</p> : null}
         </div>
 
         <div className="space-y-2 sm:col-span-2">

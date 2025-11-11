@@ -135,7 +135,8 @@ export function ProductsView({ initialProducts, sellerName, categories }: Produc
     setIsSubmitting(false);
   };
 
-  const handleSubmit = async (values: ProductFormValues) => {
+  const handleSubmit = async (values: ProductFormValues, imageFiles: File[]) => {
+    void imageFiles;
     setFormError(null);
     setIsSubmitting(true);
     const payload = formMode === "edit" ? { ...values, id: activeProduct?.id } : values;
