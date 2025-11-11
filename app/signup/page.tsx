@@ -1,8 +1,8 @@
-'use client'
+'use client';
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 
 import { SignupForm } from "@/components/auth/signup-form";
 import {
@@ -14,12 +14,12 @@ import {
 } from "@/components/ui/card";
 import { getCurrentSession } from "@/lib/auth/session";
 
-export default function SignupPage() {
+function SignupPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    getCurrentSession().then((session) => {
+    void getCurrentSession().then((session) => {
       if (session) {
         router.replace("/dashboard/products");
       }
@@ -53,7 +53,7 @@ export default function SignupPage() {
         </Card>
 
         <p className="text-center text-xs text-slate-500">
-          Already have an account? {" "}
+          Already have an account?{" "}
           <Link
             className="font-medium text-slate-900 underline underline-offset-4"
             href={redirectToParam ? `/login?redirectTo=${encodeURIComponent(redirectToParam)}` : "/login"}
@@ -63,5 +63,13 @@ export default function SignupPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+      <SignupPageInner />
+    </Suspense>
   );
 }

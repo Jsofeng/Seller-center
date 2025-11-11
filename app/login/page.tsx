@@ -1,6 +1,8 @@
-'use client'
+'use client';
+
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect } from "react";
 
 import { LoginForm } from "@/components/auth/login-form";
 import {
@@ -11,30 +13,21 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getCurrentSession } from "@/lib/auth/session";
-import { useEffect } from "react";
 
-
-
-
-
-export default function LoginPage() {
-
+function LoginPageInner() {
   const router = useRouter();
-  const searchParams = useSearchParams()
+  const searchParams = useSearchParams();
 
-  useEffect(()=>{
-  getCurrentSession().then((session) => {
-    if (session) {
+  useEffect(() => {
+    void getCurrentSession().then((session) => {
+      if (session) {
         router.replace("/dashboard/products");
       }
-  });
-  },[router])
+    });
+  }, [router]);
 
-  
- 
-  
+  const redirectToParam = searchParams.get("redirectTo") ? searchParams.get("redirectTo") : null;
 
-  const redirectToParam = searchParams.get("redirectTo") ? searchParams.get("redirectTo"): null   
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-4 py-12">
       <div className="mx-auto w-full max-w-md space-y-6">
@@ -57,7 +50,7 @@ export default function LoginPage() {
           </CardHeader>
 
           <CardContent>
-            <LoginForm  redirectTo={redirectToParam} />
+            <LoginForm redirectTo={redirectToParam} />
           </CardContent>
         </Card>
 
@@ -75,3 +68,10 @@ export default function LoginPage() {
   );
 }
 
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+      <LoginPageInner />
+    </Suspense>
+  );
+}
