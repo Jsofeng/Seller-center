@@ -8,7 +8,8 @@ import {
   deleteProduct as deleteProductFromDb,
   updateProduct,
   type Product,
-  type ProductInput,
+  type ProductIncotermInput,
+  type ProductRecordInput,
 } from "@/lib/products";
 import { productFormSchema, type ProductFormValues } from "@/lib/validations/product";
 
@@ -18,16 +19,49 @@ type ProductActionResult =
 
 type DeleteProductResult = { success: true; id: string } | { error: string };
 
-function toProductInput(values: ProductFormValues): ProductInput {
+function normalizeDescription(value: string | null) {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function toRecordInput(values: ProductFormValues): ProductRecordInput {
+  const [primaryQuote] = values.incoterms;
   return {
     name: values.name.trim(),
-    description: values.description ?? null,
-    price: values.price,
-    currency: values.currency,
+    description: normalizeDescription(values.description),
+    price: primaryQuote?.price ?? 0,
+    currency: primaryQuote?.currency ?? "USD",
     status: values.status,
     inventory: values.inventory,
-    image_url: values.image_url ?? null,
+    category_id: values.categoryId,
+    subcategory_id: values.subcategoryId,
+    hs_code: values.hsCode,
+    min_order_quantity: null,
+    lead_time_days: null,
+    packaging_length_cm: null,
+    packaging_width_cm: null,
+    packaging_height_cm: null,
+    packaging_weight_kg: null,
+    shipping_notes: null,
+    moq: values.moq,
+    cartons_per_moq: values.cartonsPerMoq ?? null,
+    pallets_per_moq: values.palletsPerMoq ?? null,
+    containers_20ft_per_moq: values.containers20ft ?? null,
+    containers_40ft_per_moq: values.containers40ft ?? null,
   };
+}
+
+function toIncotermInputs(values: ProductFormValues): ProductIncotermInput[] {
+  return values.incoterms.map((incoterm) => ({
+    id: incoterm.id,
+    term: incoterm.term,
+    currency: incoterm.currency,
+    price: incoterm.price,
+    port: incoterm.port,
+  }));
 }
 
 export async function createProductAction(
@@ -43,7 +77,14 @@ export async function createProductAction(
     return { error: parsed.error.flatten().formErrors.join(". ") || "Invalid product data." };
   }
 
-  const { data, error } = await createProduct(user.id, toProductInput(parsed.data));
+  const recordInput = toRecordInput(parsed.data);
+  const incotermInputs = toIncotermInputs(parsed.data);
+
+  if (!incotermInputs.length) {
+    return { error: "Add at least one incoterm quote." };
+  }
+
+  const { data, error } = await createProduct(user.id, recordInput, incotermInputs);
 
   if (error) {
     return { error: error.message };
@@ -74,7 +115,20 @@ export async function updateProductAction(
     return { error: parsed.error.flatten().formErrors.join(". ") || "Invalid product data." };
   }
 
-  const { data, error } = await updateProduct(values.id, toProductInput(parsed.data));
+  const recordInput = toRecordInput(parsed.data);
+  const incotermInputs = toIncotermInputs(parsed.data);
+  const removedIncotermIds = parsed.data.removedIncotermIds ?? [];
+
+  if (!incotermInputs.length) {
+    return { error: "Add at least one incoterm quote." };
+  }
+
+  const { data, error } = await updateProduct(
+    values.id,
+    recordInput,
+    incotermInputs,
+    removedIncotermIds,
+  );
   if (error) {
     return { error: error.message };
   }

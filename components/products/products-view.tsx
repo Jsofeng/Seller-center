@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -14,13 +14,20 @@ import { ProductForm } from "@/components/products/product-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Modal } from "@/components/ui/dialog";
+import {
+  INCOTERM_CURRENCY_OPTIONS,
+  INCOTERM_OPTIONS,
+  INCOTERM_PORT_OPTIONS,
+  type IncotermCurrency,
+} from "@/lib/constants/incoterms";
 import type { Product } from "@/lib/products";
 import type { ProductFormValues } from "@/lib/validations/product";
+import type { CategoryWithChildren } from "@/lib/categories";
 
 interface ProductsViewProps {
   initialProducts: Product[];
   sellerName: string | null;
+  categories: CategoryWithChildren[];
 }
 
 type ProductFormMode = "create" | "edit";
@@ -30,8 +37,54 @@ const statusVariant: Record<Product["status"], "default" | "success" | "warning"
   published: "success",
   archived: "default",
 };
+const DEFAULT_INCOTERM_CURRENCY: IncotermCurrency = INCOTERM_CURRENCY_OPTIONS[0];
+const DEFAULT_INCOTERM_TERM: ProductFormValues["incoterms"][number]["term"] = INCOTERM_OPTIONS[0].code;
+const DEFAULT_INCOTERM_PORT: ProductFormValues["incoterms"][number]["port"] = INCOTERM_PORT_OPTIONS[0];
 
-export function ProductsView({ initialProducts, sellerName }: ProductsViewProps) {
+function toFormValues(product: Product): ProductFormValues {
+  const normalizedCurrency = product.currency?.toUpperCase() as IncotermCurrency | undefined;
+  const fallbackCurrency = normalizedCurrency && INCOTERM_CURRENCY_OPTIONS.includes(normalizedCurrency)
+    ? normalizedCurrency
+    : DEFAULT_INCOTERM_CURRENCY;
+
+  const incotermQuotes =
+    product.incoterms.length > 0
+      ? product.incoterms.map((quote) => ({
+          id: quote.id,
+          term: quote.term,
+          currency: quote.currency,
+          price: quote.price,
+          port: quote.port,
+        }))
+      : [
+          {
+            term: DEFAULT_INCOTERM_TERM,
+            currency: fallbackCurrency,
+            price: product.price,
+            port: DEFAULT_INCOTERM_PORT,
+          },
+        ];
+
+  return {
+    id: product.id,
+    name: product.name,
+    description: product.description ?? "",
+    status: product.status,
+    inventory: product.inventory,
+    categoryId: product.category_id ?? "",
+    subcategoryId: product.subcategory_id ?? "",
+    hsCode: product.hs_code ?? "",
+    moq: product.moq,
+    cartonsPerMoq: product.cartons_per_moq,
+    palletsPerMoq: product.pallets_per_moq,
+    containers20ft: product.containers_20ft_per_moq,
+    containers40ft: product.containers_40ft_per_moq,
+    incoterms: incotermQuotes,
+    removedIncotermIds: [],
+  };
+}
+
+export function ProductsView({ initialProducts, sellerName, categories }: ProductsViewProps) {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [formOpen, setFormOpen] = useState(false);
@@ -52,6 +105,11 @@ export function ProductsView({ initialProducts, sellerName }: ProductsViewProps)
     }
     return "Add product";
   }, [formMode, activeProduct]);
+
+  const formDescription =
+    formMode === "edit"
+      ? "Update your listing details."
+      : "Provide the details buyers will see on your listing.";
 
   const openCreateForm = () => {
     setActiveProduct(null);
@@ -141,12 +199,46 @@ export function ProductsView({ initialProducts, sellerName }: ProductsViewProps)
             Manage your catalog and keep your listings up to date, {sellerName}.
           </p>
         </div>
-        <Button onClick={openCreateForm} className="self-start sm:self-auto">
-          <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
-          Add product
+        <Button
+          onClick={formOpen ? closeForm : openCreateForm}
+          className="self-start sm:self-auto"
+          variant={formOpen ? "outline" : "default"}
+        >
+          {formOpen ? (
+            <>
+              <X className="mr-2 h-4 w-4" aria-hidden="true" />
+              Close form
+            </>
+          ) : (
+            <>
+              <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+              Add product
+            </>
+          )}
         </Button>
       </div>
-      {emptyState ? (
+
+      {formOpen ? (
+        <div className="space-y-6 rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 px-6 py-5">
+            <h2 className="text-lg font-semibold text-slate-900">{heading}</h2>
+            <p className="text-sm text-slate-600">{formDescription}</p>
+          </div>
+          <div className="px-6 pb-6">
+            <ProductForm
+              mode={formMode}
+              initialValues={activeProduct ? toFormValues(activeProduct) : undefined}
+              categories={categories}
+              error={formError}
+              onSubmit={handleSubmit}
+              onCancel={closeForm}
+              isSubmitting={isSubmitting}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {emptyState && !formOpen ? (
         <Card className="text-center">
           <CardHeader>
             <CardTitle className="text-xl">No products yet</CardTitle>
@@ -161,7 +253,9 @@ export function ProductsView({ initialProducts, sellerName }: ProductsViewProps)
             </Button>
           </CardContent>
         </Card>
-      ) : (
+      ) : null}
+
+      {!emptyState ? (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
@@ -174,6 +268,9 @@ export function ProductsView({ initialProducts, sellerName }: ProductsViewProps)
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Price
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Category
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Inventory
@@ -201,6 +298,11 @@ export function ProductsView({ initialProducts, sellerName }: ProductsViewProps)
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-700">
                     {formatCurrency(product.price, product.currency)}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-slate-700">
+                    {product.category?.name
+                      ? `${product.category.name}${product.subcategory?.name ? ` / ${product.subcategory.name}` : ""}`
+                      : "—"}
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-700">
                     {product.inventory ?? "—"}
@@ -233,40 +335,7 @@ export function ProductsView({ initialProducts, sellerName }: ProductsViewProps)
             </tbody>
           </table>
         </div>
-      )}
-
-      <Modal
-        open={formOpen}
-        onClose={closeForm}
-        title={heading}
-        description={
-          formMode === "edit"
-            ? "Update your listing details."
-            : "Provide the details buyers will see on your listing."
-        }
-      >
-        <ProductForm
-          mode={formMode}
-          initialValues={
-            activeProduct
-              ? {
-                  id: activeProduct.id,
-                  name: activeProduct.name,
-                  description: activeProduct.description ?? "",
-                  price: activeProduct.price,
-                  currency: activeProduct.currency,
-                  status: activeProduct.status,
-                  inventory: activeProduct.inventory ?? null,
-                  image_url: activeProduct.image_url ?? "",
-                }
-              : undefined
-          }
-          error={formError}
-          onSubmit={handleSubmit}
-          onCancel={closeForm}
-          isSubmitting={isSubmitting}
-        />
-      </Modal>
+      ) : null}
     </div>
   );
 }

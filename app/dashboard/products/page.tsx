@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { ProductsView } from "@/components/products/products-view";
+import { getAllCategories } from "@/lib/categories";
 import { getCurrentServerUser } from "@/lib/auth/server";
 import { getProductsBySeller } from "@/lib/products";
 
@@ -21,10 +22,13 @@ export default async function ProductsPage() {
     console.error("Failed to load products", error);
   }
 
+  const categories = await getAllCategories();
+
   return (
     <ProductsView
       initialProducts={products ?? []}
       sellerName={user.user_metadata?.full_name ?? user.email}
+      categories={categories}
     />
   );
 }

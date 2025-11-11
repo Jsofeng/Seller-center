@@ -5,10 +5,13 @@ A Next.js 14 dashboard where sellers authenticate with Supabase, manage their pr
 ### Prerequisites
 
 - Node.js 18+ and npm
-- Supabase project with the following tables:
+- Supabase project with the following schema:
   - `profiles` — columns: `id uuid primary key`, `full_name text`, `company_name text`, `phone text`, `website text`, `bio text`, `avatar_url text`, `created_at timestamptz`, `updated_at timestamptz`
-  - `products` — columns: `id uuid`, `seller_id uuid references profiles(id)`, `name text`, `description text`, `price numeric`, `currency text`, `status text`, `inventory integer`, `image_url text`, `created_at timestamptz`, `updated_at timestamptz`
-  - Enable Row Level Security with policies that scope rows to `auth.uid()`
+- `products` — columns: `id uuid`, `seller_id uuid references profiles(id)`, `name text`, `description text`, `price numeric`, `currency text`, `status text`, `inventory integer`, plus the extended catalogue/logistics fields introduced in `supabase/sql/20251111_add_product_catalog_extensions.sql` (category links, HS code, `moq`, `cartons_per_moq`, `pallets_per_moq`, `containers_20ft_per_moq`, `containers_40ft_per_moq`, `shipping_notes`, etc.)
+- Supporting tables: `categories`, `subcategories`, `product_incoterms` (stores multiple quotes per product with `term`, `currency`, `price`, `port`)
+- Enable Row Level Security with policies that scope rows to `auth.uid()` (see SQL migration for policies applied to the new tables)
+
+> 💡 Run the SQL file under `supabase/sql/20251111_add_product_catalog_extensions.sql` in the Supabase SQL editor (or via the CLI) to create the catalogue tables and policies. Seed the `categories` / `subcategories` tables with the taxonomy you want to expose in the product form.
 
 ### Environment Variables
 

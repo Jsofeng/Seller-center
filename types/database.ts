@@ -54,7 +54,21 @@ export interface Database {
           currency: string;
           status: "draft" | "published" | "archived";
           inventory: number | null;
-          image_url: string | null;
+          category_id: string | null;
+          subcategory_id: string | null;
+          hs_code: string | null;
+          min_order_quantity: number | null;
+          lead_time_days: number | null;
+          packaging_length_cm: number | null;
+          packaging_width_cm: number | null;
+          packaging_height_cm: number | null;
+          packaging_weight_kg: number | null;
+          shipping_notes: string | null;
+        moq: number;
+        cartons_per_moq: number | null;
+        pallets_per_moq: number | null;
+        containers_20ft_per_moq: number | null;
+        containers_40ft_per_moq: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -67,7 +81,21 @@ export interface Database {
           currency?: string;
           status?: "draft" | "published" | "archived";
           inventory?: number | null;
-          image_url?: string | null;
+          category_id?: string | null;
+          subcategory_id?: string | null;
+          hs_code?: string | null;
+          min_order_quantity?: number | null;
+          lead_time_days?: number | null;
+          packaging_length_cm?: number | null;
+          packaging_width_cm?: number | null;
+          packaging_height_cm?: number | null;
+          packaging_weight_kg?: number | null;
+          shipping_notes?: string | null;
+        moq?: number;
+        cartons_per_moq?: number | null;
+        pallets_per_moq?: number | null;
+        containers_20ft_per_moq?: number | null;
+        containers_40ft_per_moq?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -78,7 +106,21 @@ export interface Database {
           currency?: string;
           status?: "draft" | "published" | "archived";
           inventory?: number | null;
-          image_url?: string | null;
+          category_id?: string | null;
+          subcategory_id?: string | null;
+          hs_code?: string | null;
+          min_order_quantity?: number | null;
+          lead_time_days?: number | null;
+          packaging_length_cm?: number | null;
+          packaging_width_cm?: number | null;
+          packaging_height_cm?: number | null;
+          packaging_weight_kg?: number | null;
+          shipping_notes?: string | null;
+        moq?: number;
+        cartons_per_moq?: number | null;
+        pallets_per_moq?: number | null;
+        containers_20ft_per_moq?: number | null;
+        containers_40ft_per_moq?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -87,6 +129,104 @@ export interface Database {
             foreignKeyName: "products_seller_id_fkey";
             columns: ["seller_id"];
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "products_category_id_fkey";
+            columns: ["category_id"];
+            referencedRelation: "categories";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "products_subcategory_id_fkey";
+            columns: ["subcategory_id"];
+            referencedRelation: "subcategories";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      categories: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          slug: string;
+          created_at?: string;
+        };
+        Update: {
+          name?: string;
+          slug?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      subcategories: {
+        Row: {
+          id: string;
+          category_id: string;
+          name: string;
+          slug: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          category_id: string;
+          name: string;
+          slug: string;
+          created_at?: string;
+        };
+        Update: {
+          category_id?: string;
+          name?: string;
+          slug?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "subcategories_category_id_fkey";
+            columns: ["category_id"];
+            referencedRelation: "categories";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      product_incoterms: {
+        Row: {
+          id: string;
+          product_id: string;
+          term: string;
+          currency: string;
+          price: number;
+          port: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          term: string;
+          currency: string;
+          price: number;
+          port: string;
+          created_at?: string;
+        };
+        Update: {
+          product_id?: string;
+          term?: string;
+          currency?: string;
+          price?: number;
+          port?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "product_incoterms_product_id_fkey";
+            columns: ["product_id"];
+            referencedRelation: "products";
             referencedColumns: ["id"];
           },
         ];
