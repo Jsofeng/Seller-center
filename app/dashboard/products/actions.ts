@@ -56,7 +56,7 @@ function toRecordInput(values: ProductFormValues): ProductRecordInput {
 
 function toIncotermInputs(values: ProductFormValues): ProductIncotermInput[] {
   return values.incoterms.map((incoterm) => ({
-    id: incoterm.id,
+    id: incoterm.recordId,
     term: incoterm.term,
     currency: incoterm.currency,
     price: incoterm.price,

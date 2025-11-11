@@ -63,7 +63,7 @@ interface ProductFormProps {
 
 function toInputDefaults(initialValues?: Partial<ProductFormValues>): ProductFormInputs {
   const mapIncoterm = (incoterm?: ProductFormValues["incoterms"][number]) => ({
-    id: incoterm?.id,
+    recordId: incoterm?.recordId,
     term: incoterm?.term ?? DEFAULT_INCOTERM_TERM,
     currency: incoterm?.currency ?? DEFAULT_INCOTERM_CURRENCY,
     price: incoterm?.price !== undefined && incoterm?.price !== null ? String(incoterm.price) : "",
@@ -214,9 +214,9 @@ export function ProductForm({
 
   const handleIncotermRemove = (index: number) => {
     const incoterm = getValues("incoterms")[index];
-    if (incoterm?.id) {
+    if (incoterm?.recordId) {
       const removedIds = getValues("removedIncotermIds") ?? [];
-      setValue("removedIncotermIds", [...removedIds, incoterm.id], { shouldDirty: true });
+      setValue("removedIncotermIds", [...removedIds, incoterm.recordId], { shouldDirty: true });
     }
     removeIncoterm(index);
   };
@@ -383,7 +383,7 @@ export function ProductForm({
             const rowErrors = incotermArrayErrors[index];
             return (
             <div
-              key={field.id ?? index}
+              key={field.recordId ?? field.id ?? index}
               className="grid grid-cols-1 gap-4 rounded-lg border border-slate-200 p-4 md:grid-cols-4"
             >
               <div className="space-y-2">

@@ -80,7 +80,7 @@ const positiveInteger = z.preprocess(
 );
 
 const incotermQuoteSchema = z.object({
-  id: z.string().uuid().optional(),
+  recordId: z.string().uuid().optional(),
   term: IncotermTermEnum,
   currency: CurrencyEnum,
   price: z.preprocess(
