@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Plus, Pencil, Trash2, X } from "lucide-react";
+import { Eye, Plus, Pencil, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -9,6 +9,7 @@ import {
   createProductAction,
   deleteProductAction,
   updateProductAction,
+  uploadProductImagesAction,
 } from "@/app/dashboard/products/actions";
 import { ProductForm } from "@/components/products/product-form";
 import { Badge } from "@/components/ui/badge";
@@ -93,14 +94,29 @@ export function ProductsView({ initialProducts, sellerName, categories }: Produc
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<ProductFormMode>("create");
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
+  const [viewProduct, setViewProduct] = useState<Product | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [isDeletePending, startDeleteTransition] = useTransition();
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const viewIncoterms = viewProduct?.incoterms ?? [];
+
   useEffect(() => {
     setProducts(initialProducts);
   }, [initialProducts]);
+
+  useEffect(() => {
+    if (!viewProduct) {
+      return;
+    }
+    const updated = initialProducts.find((item) => item.id === viewProduct.id);
+    if (updated) {
+      setViewProduct(updated);
+    } else {
+      setViewProduct(null);
+    }
+  }, [initialProducts, viewProduct]);
 
   const heading = useMemo(() => {
     if (formMode === "edit" && activeProduct) {
@@ -119,6 +135,7 @@ export function ProductsView({ initialProducts, sellerName, categories }: Produc
     setFormMode("create");
     setFormError(null);
     setFormOpen(true);
+    setViewProduct(null);
   };
 
   const openEditForm = (product: Product) => {
@@ -126,6 +143,18 @@ export function ProductsView({ initialProducts, sellerName, categories }: Produc
     setFormMode("edit");
     setFormError(null);
     setFormOpen(true);
+    setViewProduct(null);
+  };
+
+  const openView = (product: Product) => {
+    setViewProduct(product);
+    setFormOpen(false);
+    setFormError(null);
+    setActiveProduct(null);
+  };
+
+  const closeView = () => {
+    setViewProduct(null);
   };
 
   const closeForm = () => {
@@ -165,10 +194,28 @@ export function ProductsView({ initialProducts, sellerName, categories }: Produc
       setProducts((prev) =>
         prev.map((item) => (item.id === product.id ? product : item)),
       );
+      if (viewProduct?.id === product.id) {
+        setViewProduct(product);
+      }
       toast.success(`${product.name} updated.`);
     } else {
       setProducts((prev) => [product, ...prev]);
       toast.success(`${product.name} created.`);
+    }
+
+    if (imageFiles.length) {
+      const uploadFormData = new FormData();
+      uploadFormData.append("productId", product.id);
+      imageFiles.forEach((file) => uploadFormData.append("images", file));
+
+      const uploadResult = await uploadProductImagesAction(uploadFormData);
+      if ("error" in uploadResult) {
+        toast.error(uploadResult.error);
+      } else if (uploadResult.count > 0) {
+        toast.success(
+          `${uploadResult.count} image${uploadResult.count > 1 ? "s" : ""} uploaded.`,
+        );
+      }
     }
 
     setIsSubmitting(false);
@@ -188,6 +235,9 @@ export function ProductsView({ initialProducts, sellerName, categories }: Produc
       setProducts((prev) => prev.filter((item) => item.id !== product.id));
       toast.success(`${product.name} deleted.`);
       setPendingDeleteId(null);
+      if (viewProduct?.id === product.id) {
+        setViewProduct(null);
+      }
       router.refresh();
     });
   };
@@ -204,6 +254,7 @@ export function ProductsView({ initialProducts, sellerName, categories }: Produc
           </p>
         </div>
         <Button
+          type="button"
           onClick={formOpen ? closeForm : openCreateForm}
           className="self-start sm:self-auto"
           variant={formOpen ? "outline" : "default"}
@@ -251,7 +302,7 @@ export function ProductsView({ initialProducts, sellerName, categories }: Produc
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={openCreateForm}>
+            <Button type="button" onClick={openCreateForm}>
               <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
               Create a product
             </Button>
@@ -314,6 +365,17 @@ export function ProductsView({ initialProducts, sellerName, categories }: Produc
                   <td className="px-6 py-4">
                     <div className="flex justify-end gap-2">
                       <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openView(product)}
+                        className="text-slate-600 hover:text-slate-900"
+                      >
+                        <Eye className="mr-1 h-4 w-4" aria-hidden="true" />
+                        View
+                      </Button>
+                      <Button
+                        type="button"
                         variant="ghost"
                         size="sm"
                         onClick={() => openEditForm(product)}
@@ -323,6 +385,7 @@ export function ProductsView({ initialProducts, sellerName, categories }: Produc
                         Edit
                       </Button>
                       <Button
+                        type="button"
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDelete(product)}
@@ -339,6 +402,112 @@ export function ProductsView({ initialProducts, sellerName, categories }: Produc
             </tbody>
           </table>
         </div>
+      ) : null}
+
+      {viewProduct ? (
+        <Card className="border-slate-200 shadow-sm">
+          <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-xl text-slate-900">{viewProduct.name}</CardTitle>
+              <CardDescription>
+                {viewProduct.category?.name
+                  ? `${viewProduct.category.name}${
+                      viewProduct.subcategory?.name ? ` / ${viewProduct.subcategory.name}` : ""
+                    }`
+                  : "Uncategorized"}
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant={statusVariant[viewProduct.status]}>{viewProduct.status}</Badge>
+              <Button type="button" variant="outline" size="sm" onClick={closeView}>
+                Close
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6 text-sm text-slate-700">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-500">Price</p>
+                <p className="font-medium text-slate-900">{formatCurrency(viewProduct.price, viewProduct.currency)}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-500">Inventory</p>
+                <p className="font-medium text-slate-900">{viewProduct.inventory ?? "Not specified"}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-500">MOQ</p>
+                <p className="font-medium text-slate-900">{viewProduct.moq}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-500">HS Code</p>
+                <p className="font-medium text-slate-900">{viewProduct.hs_code ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-500">Last updated</p>
+                <p className="font-medium text-slate-900">
+                  {new Intl.DateTimeFormat("en-US", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  }).format(new Date(viewProduct.updated_at))}
+                </p>
+              </div>
+            </div>
+
+            {viewProduct.description ? (
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold text-slate-900">Description</h4>
+                <p className="whitespace-pre-line text-slate-700">{viewProduct.description}</p>
+              </div>
+            ) : null}
+
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold text-slate-900">Incoterm quotes</h4>
+              {viewIncoterms.length ? (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {viewIncoterms.map((quote) => (
+                    <div key={quote.id} className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                      <p className="text-sm font-semibold text-slate-900">
+                        {quote.term} · {quote.port}
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {formatCurrency(quote.price, quote.currency)} {quote.currency}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">No incoterm quotes recorded.</p>
+              )}
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-500">Cartons / MOQ</p>
+                <p className="font-medium text-slate-900">{viewProduct.cartons_per_moq ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-500">Pallets / MOQ</p>
+                <p className="font-medium text-slate-900">{viewProduct.pallets_per_moq ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-500">20ft Containers / MOQ</p>
+                <p className="font-medium text-slate-900">{viewProduct.containers_20ft_per_moq ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-500">40ft Containers / MOQ</p>
+                <p className="font-medium text-slate-900">{viewProduct.containers_40ft_per_moq ?? "—"}</p>
+              </div>
+              <div className="md:col-span-2 lg:col-span-3">
+                <p className="text-xs uppercase tracking-wide text-slate-500">Shipping Notes</p>
+                <p className="font-medium text-slate-900">
+                  {viewProduct.shipping_notes && viewProduct.shipping_notes.trim()
+                    ? viewProduct.shipping_notes
+                    : "No additional notes."}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       ) : null}
     </div>
   );

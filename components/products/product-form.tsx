@@ -318,6 +318,14 @@ export function ProductForm({
     };
   }, [imagePreviews]);
 
+  useEffect(() => {
+    setImagePreviews((previous) => {
+      previous.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+      return [];
+    });
+    setImageError(null);
+  }, [mode, initialValues?.id]);
+
   const addIncoterm = () => {
     if (incotermFields.length >= 5) {
       return;

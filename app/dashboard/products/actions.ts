@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
+import { randomUUID } from "crypto";
+
 import { getCurrentServerUser } from "@/lib/auth/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { getSupabaseServiceClient } from "@/lib/supabase/service-client";
 import {
   createProduct,
   deleteProduct as deleteProductFromDb,
@@ -18,6 +22,7 @@ type ProductActionResult =
   | { error: string };
 
 type DeleteProductResult = { success: true; id: string } | { error: string };
+type UploadImagesResult = { success: true; count: number } | { error: string };
 
 function normalizeDescription(value: string | null) {
   if (!value) {
@@ -163,5 +168,112 @@ export async function deleteProductAction(id: string): Promise<DeleteProductResu
 
   revalidatePath("/dashboard/products");
   return { success: true, id };
+}
+
+export async function uploadProductImagesAction(formData: FormData): Promise<UploadImagesResult> {
+  const user = await getCurrentServerUser();
+  if (!user) {
+    return { error: "You must be signed in to upload images." };
+  }
+
+  const productId = formData.get("productId");
+  if (!productId || typeof productId !== "string") {
+    return { error: "Missing product identifier." };
+  }
+
+  const files = formData
+    .getAll("images")
+    .filter((value): value is File => value instanceof File && value.size > 0);
+
+  if (!files.length) {
+    return { success: true, count: 0 };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: product, error: productError } = await supabase
+    .from("products")
+    .select("id, seller_id, primary_image_id, images_count")
+    .eq("id", productId)
+    .single();
+
+  if (productError || !product) {
+    return { error: productError?.message ?? "Unable to load product." };
+  }
+
+  if (product.seller_id !== user.id) {
+    return { error: "You are not allowed to manage this product." };
+  }
+
+  const serviceClient = getSupabaseServiceClient();
+
+  const { data: existingImages, error: existingImagesError } = await serviceClient
+    .from("product_images")
+    .select("id, position")
+    .eq("product_id", productId)
+    .order("position", { ascending: true });
+
+  if (existingImagesError) {
+    return { error: existingImagesError.message };
+  }
+
+  let position = existingImages?.length ?? 0;
+  const insertedIds: string[] = [];
+
+  for (const file of files) {
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const extension = file.type?.split("/").pop() || "bin";
+    const fileName = `${position}-${randomUUID()}.${extension}`;
+    const storagePath = `${productId}/${fileName}`;
+
+    const { error: uploadError } = await serviceClient.storage
+      .from("product-images")
+      .upload(storagePath, buffer, {
+        contentType: file.type || "application/octet-stream",
+        upsert: false,
+        cacheControl: "3600",
+      });
+
+    if (uploadError) {
+      return { error: uploadError.message };
+    }
+
+    const { data: inserted, error: insertError } = await serviceClient
+      .from("product_images")
+      .insert({
+        product_id: productId,
+        storage_path: storagePath,
+        position,
+      })
+      .select("id")
+      .single();
+
+    if (insertError || !inserted) {
+      return { error: insertError?.message ?? "Failed to record uploaded image." };
+    }
+
+    insertedIds.push(inserted.id);
+    position += 1;
+  }
+
+  const primaryImageId =
+    product.primary_image_id ?? insertedIds[0] ?? existingImages?.[0]?.id ?? null;
+  const imagesCount = (product.images_count ?? 0) + insertedIds.length;
+
+  const { error: updateError } = await serviceClient
+    .from("products")
+    .update({
+      primary_image_id: primaryImageId,
+      images_count: imagesCount,
+      images_last_synced_at: new Date().toISOString(),
+    })
+    .eq("id", productId);
+
+  if (updateError) {
+    return { error: updateError.message };
+  }
+
+  revalidatePath("/dashboard/products");
+  return { success: true, count: insertedIds.length };
 }
 
