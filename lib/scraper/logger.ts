@@ -18,13 +18,21 @@ function formatMessage(
   prefix: string,
   level: "info" | "warn" | "error",
   message: string,
-  meta?: Record<string, unknown>,
+  meta?: unknown,
 ) {
   const time = new Date().toISOString();
   const base = `[${time}] [${prefix}] [${level.toUpperCase()}] ${message}`;
-  if (!meta || !Object.keys(meta).length) {
+  if (meta === undefined || meta === null) {
     return base;
   }
-  return `${base} ${JSON.stringify(meta)}`;
+  if (typeof meta === "object") {
+    const metaObject = meta as Record<string, unknown>;
+    if (!Object.keys(metaObject).length) {
+      return base;
+    }
+    return `${base} ${JSON.stringify(metaObject)}`;
+  }
+  return `${base} ${String(meta)}`;
 }
+
 
