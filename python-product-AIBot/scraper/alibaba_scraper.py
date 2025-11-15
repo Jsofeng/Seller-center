@@ -4,7 +4,7 @@ class AlibabaScraper:
 
     def run(self, query, max_results=5):
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)  # browser runs in the background, no UI shown
+            browser = p.chromium.launch(headless=True)  # browser runs in the background, head=True (no UI shown)
             page = browser.new_page()
 
             url = f"https://www.alibaba.com/trade/search?SearchText={query}"
